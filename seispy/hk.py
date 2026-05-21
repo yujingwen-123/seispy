@@ -158,7 +158,15 @@ def ci(allstack, h, kappa, ev_num):
 
     cvalue = 1 - np.std(allstack.reshape(allstack.size)) / np.sqrt(ev_num)
     cs = plt.contour(h, kappa, allstack, [cvalue])
-    cs_path = cs.collections[0].get_paths()[0].vertices
+    if hasattr(cs, 'collections'):
+        paths = cs.collections[0].get_paths()
+        if len(paths) == 0:
+            raise ValueError('No contour path found for confidence level {}'.format(cvalue))
+        cs_path = paths[0].vertices
+    else:
+        if len(cs.allsegs) == 0 or len(cs.allsegs[0]) == 0:
+            raise ValueError('No contour path found for confidence level {}'.format(cvalue))
+        cs_path = cs.allsegs[0][0]
     maxhsig = (np.max(cs_path[:, 0]) - np.min(cs_path[:, 0])) / 2
     maxksig = (np.max(cs_path[:, 1]) - np.min(cs_path[:, 1])) / 2
     plt.close()

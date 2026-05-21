@@ -3,6 +3,11 @@ import configparser
 import numpy as np
 from seispy.utils import check_path, array_instance
 
+_BOOL_STATES = {
+    '1': True, 'yes': True, 'true': True, 'on': True, 'y': True, 't': True,
+    '0': False, 'no': False, 'false': False, 'off': False, 'n': False, 'f': False
+}
+
 
 class HKPara(object):
     def __init__(self):
@@ -72,6 +77,10 @@ def hkpara(cfg_file):
     w3 = cf.getfloat('hk', 'weight3')
     hpara.weight = (w1, w2, w3)
 
-    hpara.plot_final_only = cf.getboolean('hk', 'plot_final_only', fallback=False)
+    plot_final_only = cf.get('hk', 'plot_final_only', fallback='false').strip().lower()
+    if plot_final_only in _BOOL_STATES:
+        hpara.plot_final_only = _BOOL_STATES[plot_final_only]
+    else:
+        raise ValueError('Invalid boolean value for plot_final_only: {}'.format(plot_final_only))
     hpara.energy_grid = cf.get('hk', 'energy_grid', fallback='')
     return hpara
