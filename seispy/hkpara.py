@@ -13,6 +13,8 @@ class HKPara(object):
         self.krange = np.arange(1.6, 1.9, 0.01)
         self.vp = 6.3
         self.weight = (0.7, 0.2, 0.1)
+        self.plot_final_only = False
+        self.energy_grid = ''
     
     def __str__(self):
         head = ['{}: {}'.format(k, v) for k, v in self.__dict__.items()]
@@ -69,4 +71,7 @@ def hkpara(cfg_file):
     w2 = cf.getfloat('hk', 'weight2')
     w3 = cf.getfloat('hk', 'weight3')
     hpara.weight = (w1, w2, w3)
+
+    hpara.plot_final_only = cf.getboolean('hk', 'plot_final_only', fallback=False)
+    hpara.energy_grid = cf.get('hk', 'energy_grid', fallback='')
     return hpara
