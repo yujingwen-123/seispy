@@ -100,21 +100,26 @@ def hkstack(seis, t0, dt, p, h, kappa, vp=6.3, weight=(0.7, 0.2, 0.1)):
     return stack, stackvar, Normed_stack, allstackvar
 
 
-def plot(stack, allstack, h, kappa, besth, bestk, cvalue, cmap=load_cyan_map(), title=None, path=None):
-    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 8), sharex='col', sharey='row')
+def plot(stack, allstack, h, kappa, besth, bestk, cvalue, cmap=load_cyan_map(), title=None, path=None,
+         plot_final_only=False):
+    if plot_final_only:
+        f, ax4 = plt.subplots(1, 1, figsize=(6, 5))
+    else:
+        f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 8), sharex='col', sharey='row')
     xlim = (h[0], h[-1])
     ylim = (kappa[0], kappa[-1])
     if title is not None:
         f.suptitle(title, fontsize='large')
-    ax1.imshow(stack[:, :, 0], cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
-    ax1.set_ylabel('$V_P/V_S$')
-    ax1.set_title('Ps')
-    ax2.imshow(stack[:, :, 1], cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
-    ax2.set_title('PpPs')
-    ax3.imshow(stack[:, :, 2], cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
-    ax3.set_title('PsPs+PpSs')
-    ax3.set_xlabel('Moho depth (km)')
-    ax3.set_ylabel('$V_P/V_S$')
+    if not plot_final_only:
+        ax1.imshow(stack[:, :, 0], cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
+        ax1.set_ylabel('$V_P/V_S$')
+        ax1.set_title('Ps')
+        ax2.imshow(stack[:, :, 1], cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
+        ax2.set_title('PpPs')
+        ax3.imshow(stack[:, :, 2], cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
+        ax3.set_title('PsPs+PpSs')
+        ax3.set_xlabel('Moho depth (km)')
+        ax3.set_ylabel('$V_P/V_S$')
     im = ax4.imshow(allstack, cmap=cmap, extent=[xlim[0], xlim[1], ylim[0], ylim[1]], aspect='auto', origin='lower')
     ax4.plot(besth, bestk, color='red', marker='s', markerfacecolor='none')
     ax4.contour(allstack, [cvalue, 1], colors='k', extent=[xlim[0], xlim[1], ylim[0], ylim[1]], origin='lower')
@@ -122,7 +127,11 @@ def plot(stack, allstack, h, kappa, besth, bestk, cvalue, cmap=load_cyan_map(), 
     ax4.plot([besth, besth], ylim, color='red', linestyle='--', linewidth=0.6)
     ax4.set_xlabel('Moho depth (km)')
 
-    plt.subplots_adjust(bottom=0.1, right=0.9, top=0.9)
+    if plot_final_only:
+        ax4.set_ylabel('$V_P/V_S$')
+        plt.subplots_adjust(bottom=0.12, right=0.9, top=0.88)
+    else:
+        plt.subplots_adjust(bottom=0.1, right=0.9, top=0.9)
     _, yy, _, ww = ax4.get_position().bounds
     cax = plt.axes([0.93, yy, 0.016, ww])
     plt.colorbar(im, cax=cax)
@@ -149,7 +158,15 @@ def ci(allstack, h, kappa, ev_num):
 
     cvalue = 1 - np.std(allstack.reshape(allstack.size)) / np.sqrt(ev_num)
     cs = plt.contour(h, kappa, allstack, [cvalue])
-    cs_path = cs.collections[0].get_paths()[0].vertices
+    if hasattr(cs, 'collections'):
+        paths = cs.collections[0].get_paths()
+        if len(paths) == 0:
+            raise ValueError('No contour path found for confidence level {}'.format(cvalue))
+        cs_path = paths[0].vertices
+    else:
+        if len(cs.allsegs) == 0 or len(cs.allsegs[0]) == 0:
+            raise ValueError('No contour path found for confidence level {}'.format(cvalue))
+        cs_path = cs.allsegs[0][0]
     maxhsig = (np.max(cs_path[:, 0]) - np.min(cs_path[:, 0])) / 2
     maxksig = (np.max(cs_path[:, 1]) - np.min(cs_path[:, 1])) / 2
     plt.close()
@@ -177,11 +194,23 @@ def hksta(hpara:HKPara, isplot=False, isdisplay=False):
                                                                                      maxhsig, bestk, maxksig)
     if isdisplay:
         print_result(besth, bestk, maxhsig, maxksig, print_comment=True)
+
+    if hpara.energy_grid != '':
+        if np.ndim(allstack) != 2:
+            raise ValueError('Normalized energy stack should be 2-D matrix')
+        with open(hpara.energy_grid, 'w') as f:
+            f.write('# H(km)\tk\tnormalized_energy\n')
+            for i, k in enumerate(hpara.krange):
+                for j, h in enumerate(hpara.hrange):
+                    f.write('{:.2f}\t{:.3f}\t{:.6f}\n'.format(h, k, allstack[i, j]))
+
     if isplot:
         img_path = join(hpara.hkpath, stadata.staname+'_Hk.png')
-        plot(stack, allstack, hpara.hrange, hpara.krange, besth, bestk, cvalue, title=title, path=img_path)
+        plot(stack, allstack, hpara.hrange, hpara.krange, besth, bestk, cvalue,
+             title=title, path=img_path, plot_final_only=hpara.plot_final_only)
     else:
-        plot(stack, allstack, hpara.hrange, hpara.krange, besth, bestk, cvalue, title=title)
+        plot(stack, allstack, hpara.hrange, hpara.krange, besth, bestk, cvalue,
+             title=title, plot_final_only=hpara.plot_final_only)
 
 
 def hk():
